@@ -8,26 +8,53 @@ import com.google.android.gms.maps.model.LatLng;
 
 import java.util.ArrayList;
 
-public class Place implements Parcelable {
-    private LatLng position;
+import io.realm.RealmObject;
+import io.realm.annotations.PrimaryKey;
+
+public class Place implements Parcelable  {
+    @PrimaryKey
+    private String id;
+    private double latitude;
+    private double longitude;
     private ArrayList<String> images;
 
-    public Place(LatLng position, ArrayList<String> images) {
-        this.position = position;
+    public Place() {
+    }
+
+    public Place(double latitude, double longitude, ArrayList<String> images) {
+        this.latitude = latitude;
+        this.longitude = longitude;
         this.images = images;
     }
 
-    protected Place(Parcel in) {
-        position = in.readParcelable(LatLng.class.getClassLoader());
+    public Place(Parcel in) {
+        latitude = in.readDouble();
+        longitude = in.readDouble();
         images = in.createStringArrayList();
     }
 
-    public LatLng getPosition() {
-        return position;
+    public String getId() {
+        return id;
     }
 
-    public void setPosition(LatLng position) {
-        this.position = position;
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public double getLatitude() {
+        return latitude;
+    }
+
+    public void setLatitude(double latitude) {
+        this.latitude = latitude;
+    }
+
+    public double getLongitude() {
+        return longitude;
+    }
+
+    public void setLongitude(double longitude) {
+        this.longitude = longitude;
     }
 
     public ArrayList<String> getImages() {
@@ -45,7 +72,8 @@ public class Place implements Parcelable {
 
     @Override
     public void writeToParcel(Parcel dest, int flags) {
-        dest.writeParcelable(position, flags);
+        dest.writeDouble(latitude);
+        dest.writeDouble(longitude);
         dest.writeStringList(images);
     }
 

@@ -6,17 +6,18 @@ import android.view.LayoutInflater;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 
-import java.io.File;
-import java.util.ArrayList;
+import com.squareup.picasso.Picasso;
 
-public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
-    private ArrayList<String> dataset;
+import java.io.File;
+import java.util.List;
+
+public class MyRecyclerViewAdapter extends RecyclerView.Adapter<MyRecyclerViewAdapter.MyViewHolder> {
+    private List<String> dataset;
 
     // Provide a reference to the views for each data item
     // Complex data items may need more than one view per item, and
     // you provide access to all the views for a data item in a view holder
     public static class MyViewHolder extends RecyclerView.ViewHolder {
-        // each data item is just a string in this case
         public ImageView view;
 
         public MyViewHolder(ImageView v) {
@@ -26,18 +27,21 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
     }
 
     // Provide a suitable constructor (depends on the kind of dataset)
-    public MyAdapter(ArrayList<String> myDataset) {
+    public MyRecyclerViewAdapter(List<String> myDataset) {
         dataset = myDataset;
     }
 
     // Create new views (invoked by the layout manager)
     @Override
-    public MyAdapter.MyViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+    public MyRecyclerViewAdapter.MyViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
         // create a new view
-        ImageView v = (ImageView) LayoutInflater.from(parent.getContext())
+        ImageView view = (ImageView) LayoutInflater.from(parent.getContext())
                 .inflate(R.layout.recycler_view_item, parent, false);
-        MyViewHolder vh = new MyViewHolder(v);
-        return vh;
+        // work here if you need to control height of your items
+        // keep in mind that parent is RecyclerView in this case
+        int height = parent.getMeasuredHeight() / 3;
+        view.setMaxHeight(height);
+        return new MyViewHolder(view);
     }
 
     // Replace the contents of a view (invoked by the layout manager)
@@ -45,7 +49,8 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
     public void onBindViewHolder(MyViewHolder holder, int position) {
         // - get element from your dataset at this position
         // - replace the contents of the view with that element
-        holder.view.setImageURI(Uri.fromFile(new File(dataset.get(position))));
+        Uri imageUri = Uri.fromFile(new File(dataset.get(position)));
+        Picasso.get().load(imageUri).fit().centerInside().into(holder.view);
     }
 
     // Return the size of your dataset (invoked by the layout manager)

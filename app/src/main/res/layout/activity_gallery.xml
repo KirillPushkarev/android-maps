@@ -8,7 +8,7 @@
 
     <Button
         android:id="@+id/return_button"
-        android:layout_width="182dp"
+        android:layout_width="160dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
         android:layout_marginEnd="8dp"
@@ -20,7 +20,7 @@
 
     <Button
         android:id="@+id/capture_button"
-        android:layout_width="184dp"
+        android:layout_width="160dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
         android:layout_marginBottom="16dp"
@@ -32,10 +32,12 @@
         android:id="@+id/recycler_view"
         android:layout_width="395dp"
         android:layout_height="630dp"
+        android:layout_marginBottom="8dp"
+        android:layout_marginEnd="8dp"
         android:layout_marginStart="8dp"
         android:layout_marginTop="8dp"
-        android:layout_marginBottom="8dp"
         app:layout_constraintBottom_toTopOf="@+id/capture_button"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 

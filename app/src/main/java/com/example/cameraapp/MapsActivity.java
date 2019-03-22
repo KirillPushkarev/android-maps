@@ -4,6 +4,7 @@ import android.content.Intent;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
 
+import com.example.cameraapp.Realm.PlaceRealm;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
@@ -14,8 +15,11 @@ import com.google.android.gms.maps.model.MarkerOptions;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+
+import io.realm.Realm;
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback {
     // Request codes
@@ -29,11 +33,14 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     static final String IMAGES_KEY = "IMAGES";
 
     private GoogleMap map;
-    private HashMap<String, Place> placeByMarkerId;
+    private List<PlaceRealm> places;
+    private Realm realm;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        realm = Realm.getDefaultInstance();
         restoreInstanceState(savedInstanceState);
 
         setContentView(R.layout.activity_maps);
@@ -44,12 +51,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mapFragment.getMapAsync(this);
     }
 
-    protected void restoreInstanceState(Bundle savedInstanceState){
-        if (savedInstanceState != null){
-            placeByMarkerId = (HashMap<String, Place>)savedInstanceState.getSerializable(MARKERS_STATE_KEY);
-        } else {
-            placeByMarkerId = new HashMap<>();
-        }
+    protected void restoreInstanceState(Bundle savedInstanceState) {
+        places = realm.where(PlaceRealm.class).findAll();
     }
 
     /**
@@ -74,50 +77,88 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 Marker newMarker = map.addMarker(markerOptions);
                 String uuid = UUID.randomUUID().toString();
                 newMarker.setTag(uuid);
+                newMarker.setDraggable(true);
 
-                Place newPlace = new Place(point, new ArrayList<String>());
-                placeByMarkerId.put(uuid, newPlace);
+                final PlaceRealm newPlace = new PlaceRealm(point.latitude, point.longitude);
+                newPlace.setId(uuid);
+
+                realm.executeTransactionAsync(new Realm.Transaction() {
+                    @Override
+                    public void execute(Realm bgRealm) {
+                        bgRealm.copyToRealm(newPlace);
+                    }
+                });
             }
         });
         map.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
             @Override
             public boolean onMarkerClick(Marker marker) {
                 Intent intent = new Intent(MapsActivity.this, GalleryActivity.class);
-                String markerUuid = (String)marker.getTag();
+                String markerUuid = (String) marker.getTag();
                 intent.putExtra(MARKER_ID_KEY, markerUuid);
-                intent.putStringArrayListExtra(IMAGES_KEY, placeByMarkerId.get(markerUuid).getImages());
                 startActivityForResult(intent, REQUEST_SHOW_IMAGES_CODE);
                 return false;
             }
         });
+        map.setOnMarkerDragListener(new GoogleMap.OnMarkerDragListener() {
+            @Override
+            public void onMarkerDragStart(final Marker marker) {
+                final String markerUuid = (String)marker.getTag();
+
+                realm.executeTransactionAsync(new Realm.Transaction() {
+                    @Override
+                    public void execute(Realm bgRealm) {
+                        bgRealm.where(PlaceRealm.class).equalTo("id", markerUuid).findFirst().deleteFromRealm();
+                    }
+                }, new Realm.Transaction.OnSuccess() {
+                    @Override
+                    public void onSuccess() {
+                        marker.remove();
+                    }
+                });
+            }
+
+            @Override
+            public void onMarkerDragEnd(Marker marker) {
+                // TODO Auto-generated method stub
+
+            }
+
+            @Override
+            public void onMarkerDrag(Marker marker) {
+                // TODO Auto-generated method stub
+
+            }
+        });
 
         map.clear();
-        Iterator it = placeByMarkerId.entrySet().iterator();
-        while (it.hasNext()) {
-            Map.Entry pair = (Map.Entry)it.next();
-            String uuid = (String)pair.getKey();
-            Place place = (Place)pair.getValue();
-
-            MarkerOptions markerOptions = new MarkerOptions().position(place.getPosition());
+        for (PlaceRealm place: places) {
+            MarkerOptions markerOptions = new MarkerOptions().position(new LatLng(place.getLatitude(), place.getLongitude()));
             Marker marker = map.addMarker(markerOptions);
-            marker.setTag(uuid);
+            marker.setTag(place.getId());
+            marker.setDraggable(true);
         }
     }
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (requestCode == REQUEST_SHOW_IMAGES_CODE && resultCode == RESULT_OK) {
-            String markerId = data.getStringExtra(MARKER_ID_KEY);
-            ArrayList<String> images = data.getStringArrayListExtra(IMAGES_KEY);
-            Place place = placeByMarkerId.get(markerId);
-            placeByMarkerId.put(markerId, new Place(place.getPosition(), images));
-        }
-    }
+//    @Override
+//    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+//        if (requestCode == REQUEST_SHOW_IMAGES_CODE && resultCode == RESULT_OK) {
+//            String markerId = data.getStringExtra(MARKER_ID_KEY);
+//            ArrayList<String> images = data.getStringArrayListExtra(IMAGES_KEY);
+//            PlaceRealm place = places.get(markerId);
+//            places.put(markerId, new PlaceRealm(place.getLatitude(), place.getLongitude(), images));
+//        }
+//    }
+
+//    @Override
+//    public void onSaveInstanceState(Bundle savedInstanceState) {
+//        // Always call the superclass so it can save the view hierarchy state
+//        super.onSaveInstanceState(savedInstanceState);
+//        savedInstanceState.putSerializable(MARKERS_STATE_KEY, places);
+//    }
 
     @Override
-    public void onSaveInstanceState(Bundle savedInstanceState) {
-        // Always call the superclass so it can save the view hierarchy state
-        super.onSaveInstanceState(savedInstanceState);
-        savedInstanceState.putSerializable(MARKERS_STATE_KEY, placeByMarkerId);
+    public void onStop() {
+        super.onStop();
     }
 }

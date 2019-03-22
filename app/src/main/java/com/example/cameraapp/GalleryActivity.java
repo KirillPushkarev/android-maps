@@ -12,11 +12,14 @@ import android.support.v7.widget.RecyclerView;
 import android.view.View;
 import android.widget.Button;
 
+import com.example.cameraapp.Realm.PlaceRealm;
+
 import java.io.File;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Date;
+
+import io.realm.Realm;
 
 public class GalleryActivity extends AppCompatActivity {
     // Request codes
@@ -35,12 +38,16 @@ public class GalleryActivity extends AppCompatActivity {
 
     private String markerId;
     private String currentImagePath;
-    private ArrayList<String> images;
+    private PlaceRealm place;
+    private Realm realm;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        realm = Realm.getDefaultInstance();
         restoreInstanceState(savedInstanceState);
+
         setContentView(R.layout.activity_gallery);
 
         captureButton = findViewById(R.id.capture_button);
@@ -69,7 +76,7 @@ public class GalleryActivity extends AppCompatActivity {
         recyclerView.setLayoutManager(layoutManager);
 
         // specify an adapter (see also next example)
-        mAdapter = new MyAdapter(images);
+        mAdapter = new MyRecyclerViewAdapter(place.getImages());
         recyclerView.setAdapter(mAdapter);
     }
 
@@ -77,11 +84,11 @@ public class GalleryActivity extends AppCompatActivity {
         if (savedInstanceState != null) {
             markerId = savedInstanceState.getString(MARKER_KEY);
             currentImagePath = savedInstanceState.getString(CURRENT_IMAGE_PATH_STATE_KEY);
-            images = savedInstanceState.getStringArrayList(IMAGES_STATE_KEY);
+            place = realm.where(PlaceRealm.class).equalTo("id", markerId).findFirst();
         } else {
             Intent intent = getIntent();
             markerId = intent.getStringExtra(MapsActivity.MARKER_ID_KEY);
-            images = intent.getStringArrayListExtra(MapsActivity.IMAGES_KEY);
+            place = realm.where(PlaceRealm.class).equalTo("id", markerId).findFirst();
         }
     }
 
@@ -125,26 +132,31 @@ public class GalleryActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == REQUEST_IMAGE_CAPTURE_CODE && resultCode == RESULT_OK) {
-            images.add(currentImagePath);
-            mAdapter.notifyItemInserted(images.size() - 1);
+            realm.executeTransactionAsync(new Realm.Transaction() {
+                @Override
+                public void execute(Realm bgRealm) {
+                    PlaceRealm place = bgRealm.where(PlaceRealm.class).equalTo("id", markerId).findFirst();
+                    place.getImages().add(currentImagePath);
+                }
+            }, new Realm.Transaction.OnSuccess() {
+                @Override
+                public void onSuccess() {
+                    mAdapter.notifyItemInserted(place.getImages().size() - 1);
+                }
+            });
         }
     }
 
     private void returnToParentActivity() {
-        Intent data = new Intent();
-        data.putExtra(MapsActivity.MARKER_ID_KEY, markerId);
-        data.putStringArrayListExtra(MapsActivity.IMAGES_KEY, images);
-        setResult(RESULT_OK, data);
+        setResult(RESULT_OK);
         finish();
     }
 
     @Override
     public void onSaveInstanceState(Bundle savedInstanceState) {
-        // Always call the superclass so it can save the view hierarchy state
         super.onSaveInstanceState(savedInstanceState);
 
         savedInstanceState.putString(MARKER_KEY, markerId);
         savedInstanceState.putString(CURRENT_IMAGE_PATH_STATE_KEY, currentImagePath);
-        savedInstanceState.putStringArrayList(IMAGES_STATE_KEY, images);
     }
 }
