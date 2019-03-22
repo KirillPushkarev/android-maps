@@ -1,8 +1,6 @@
 package com.example.cameraapp;
 
 import android.content.Intent;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
@@ -10,14 +8,9 @@ import android.provider.MediaStore;
 import android.support.v4.content.FileProvider;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.GridLayoutManager;
-import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
-import android.view.LayoutInflater;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.ImageView;
-import android.widget.TextView;
 
 import java.io.File;
 import java.io.IOException;
@@ -26,8 +19,13 @@ import java.util.ArrayList;
 import java.util.Date;
 
 public class GalleryActivity extends AppCompatActivity {
-    static final int REQUEST_IMAGE_CAPTURE = 1;
-    static final String CURRENT_PHOTO_PATH_KEY = "CURRENT_PHOTO_PATH";
+    // Request codes
+    static final int REQUEST_IMAGE_CAPTURE_CODE = 1;
+
+    // Saving state keys
+    static final String MARKER_KEY = "MARKER";
+    static final String CURRENT_IMAGE_PATH_STATE_KEY = "CURRENT_IMAGE_PATH";
+    static final String IMAGES_STATE_KEY = "IMAGES";
 
     private Button captureButton;
     private Button returnButton;
@@ -35,11 +33,14 @@ public class GalleryActivity extends AppCompatActivity {
     private RecyclerView.Adapter mAdapter;
     private RecyclerView.LayoutManager layoutManager;
 
+    private String markerId;
+    private String currentImagePath;
     private ArrayList<String> images;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        restoreInstanceState(savedInstanceState);
         setContentView(R.layout.activity_gallery);
 
         captureButton = findViewById(R.id.capture_button);
@@ -68,12 +69,19 @@ public class GalleryActivity extends AppCompatActivity {
         recyclerView.setLayoutManager(layoutManager);
 
         // specify an adapter (see also next example)
-        images = new ArrayList<>();
         mAdapter = new MyAdapter(images);
         recyclerView.setAdapter(mAdapter);
+    }
 
+    protected void restoreInstanceState(Bundle savedInstanceState){
         if (savedInstanceState != null) {
-            currentPhotoPath = savedInstanceState.getString(CURRENT_PHOTO_PATH_KEY);
+            markerId = savedInstanceState.getString(MARKER_KEY);
+            currentImagePath = savedInstanceState.getString(CURRENT_IMAGE_PATH_STATE_KEY);
+            images = savedInstanceState.getStringArrayList(IMAGES_STATE_KEY);
+        } else {
+            Intent intent = getIntent();
+            markerId = intent.getStringExtra(MapsActivity.MARKER_ID_KEY);
+            images = intent.getStringArrayListExtra(MapsActivity.IMAGES_KEY);
         }
     }
 
@@ -94,12 +102,10 @@ public class GalleryActivity extends AppCompatActivity {
                         "com.example.android.fileprovider",
                         photoFile);
                 takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI);
-                startActivityForResult(takePictureIntent, REQUEST_IMAGE_CAPTURE);
+                startActivityForResult(takePictureIntent, REQUEST_IMAGE_CAPTURE_CODE);
             }
         }
     }
-
-    private String currentPhotoPath;
 
     private File createImageFile() throws IOException {
         // Create an image file name
@@ -112,21 +118,22 @@ public class GalleryActivity extends AppCompatActivity {
                 storageDir      /* directory */
         );
 
-        currentPhotoPath = image.getAbsolutePath();
+        currentImagePath = image.getAbsolutePath();
         return image;
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == RESULT_OK) {
-            images.add(currentPhotoPath);
+        if (requestCode == REQUEST_IMAGE_CAPTURE_CODE && resultCode == RESULT_OK) {
+            images.add(currentImagePath);
             mAdapter.notifyItemInserted(images.size() - 1);
         }
     }
 
     private void returnToParentActivity() {
         Intent data = new Intent();
-        data.putExtra("photos", images);
+        data.putExtra(MapsActivity.MARKER_ID_KEY, markerId);
+        data.putStringArrayListExtra(MapsActivity.IMAGES_KEY, images);
         setResult(RESULT_OK, data);
         finish();
     }
@@ -136,6 +143,8 @@ public class GalleryActivity extends AppCompatActivity {
         // Always call the superclass so it can save the view hierarchy state
         super.onSaveInstanceState(savedInstanceState);
 
-        savedInstanceState.putString(CURRENT_PHOTO_PATH_KEY, currentPhotoPath);
+        savedInstanceState.putString(MARKER_KEY, markerId);
+        savedInstanceState.putString(CURRENT_IMAGE_PATH_STATE_KEY, currentImagePath);
+        savedInstanceState.putStringArrayList(IMAGES_STATE_KEY, images);
     }
 }
