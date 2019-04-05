@@ -1,8 +1,12 @@
 package com.example.cameraapp;
 
+import android.Manifest;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
+import android.support.v4.content.ContextCompat;
 
 import com.example.cameraapp.Realm.PlaceRealm;
 import com.google.android.gms.maps.GoogleMap;
@@ -25,12 +29,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     // Request codes
     static final int REQUEST_SHOW_IMAGES_CODE = 1;
 
-    // Saving state keys
-    static final String MARKERS_STATE_KEY = "MARKERS";
-
     // Passing data to another activity keys
     static final String MARKER_ID_KEY = "MARKER_ID";
-    static final String IMAGES_KEY = "IMAGES";
+
+    // Permission request codes
+    static final int PERMISSIONS_REQUEST_LOCATION = 1;
 
     private GoogleMap map;
     private List<PlaceRealm> places;
@@ -68,42 +71,25 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     public void onMapReady(GoogleMap googleMap) {
         map = googleMap;
 
-        map.setMyLocationEnabled(true);
+        requestLocationPermission();
         map.getUiSettings().setMyLocationButtonEnabled(true);
         map.setOnMapClickListener(new GoogleMap.OnMapClickListener() {
             @Override
             public void onMapClick(LatLng point) {
-                MarkerOptions markerOptions = new MarkerOptions().position(point);
-                Marker newMarker = map.addMarker(markerOptions);
-                String uuid = UUID.randomUUID().toString();
-                newMarker.setTag(uuid);
-                newMarker.setDraggable(true);
-
-                final PlaceRealm newPlace = new PlaceRealm(point.latitude, point.longitude);
-                newPlace.setId(uuid);
-
-                realm.executeTransactionAsync(new Realm.Transaction() {
-                    @Override
-                    public void execute(Realm bgRealm) {
-                        bgRealm.copyToRealm(newPlace);
-                    }
-                });
+                addPlace(point);
             }
         });
         map.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
             @Override
             public boolean onMarkerClick(Marker marker) {
-                Intent intent = new Intent(MapsActivity.this, GalleryActivity.class);
-                String markerUuid = (String) marker.getTag();
-                intent.putExtra(MARKER_ID_KEY, markerUuid);
-                startActivityForResult(intent, REQUEST_SHOW_IMAGES_CODE);
+                startGalleryActivity(marker);
                 return false;
             }
         });
         map.setOnMarkerDragListener(new GoogleMap.OnMarkerDragListener() {
             @Override
             public void onMarkerDragStart(final Marker marker) {
-                final String markerUuid = (String)marker.getTag();
+                final String markerUuid = (String) marker.getTag();
 
                 realm.executeTransactionAsync(new Realm.Transaction() {
                     @Override
@@ -132,7 +118,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         });
 
         map.clear();
-        for (PlaceRealm place: places) {
+        for (PlaceRealm place : places) {
             MarkerOptions markerOptions = new MarkerOptions().position(new LatLng(place.getLatitude(), place.getLongitude()));
             Marker marker = map.addMarker(markerOptions);
             marker.setTag(place.getId());
@@ -140,25 +126,71 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
     }
 
-//    @Override
-//    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-//        if (requestCode == REQUEST_SHOW_IMAGES_CODE && resultCode == RESULT_OK) {
-//            String markerId = data.getStringExtra(MARKER_ID_KEY);
-//            ArrayList<String> images = data.getStringArrayListExtra(IMAGES_KEY);
-//            PlaceRealm place = places.get(markerId);
-//            places.put(markerId, new PlaceRealm(place.getLatitude(), place.getLongitude(), images));
-//        }
-//    }
-
-//    @Override
-//    public void onSaveInstanceState(Bundle savedInstanceState) {
-//        // Always call the superclass so it can save the view hierarchy state
-//        super.onSaveInstanceState(savedInstanceState);
-//        savedInstanceState.putSerializable(MARKERS_STATE_KEY, places);
-//    }
+    private void requestLocationPermission() {
+        if (ContextCompat.checkSelfPermission(MapsActivity.this,
+                Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+            // Permission is not granted
+            // Should we show an explanation?
+            if (ActivityCompat.shouldShowRequestPermissionRationale(MapsActivity.this,
+                    Manifest.permission.READ_CONTACTS)) {
+                // Show an explanation to the user *asynchronously* -- don't block
+                // this thread waiting for the user's response! After the user
+                // sees the explanation, try again to request the permission.
+            } else {
+                // No explanation needed; request the permission
+                ActivityCompat.requestPermissions(MapsActivity.this,
+                        new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                        PERMISSIONS_REQUEST_LOCATION);
+            }
+        } else {
+            enableMyLocation();
+        }
+    }
 
     @Override
-    public void onStop() {
-        super.onStop();
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        switch (requestCode) {
+            case PERMISSIONS_REQUEST_LOCATION: {
+                // If request is cancelled, the result arrays are empty.
+                if (grantResults.length > 0
+                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    // permission was granted, yay! Do the task you need to do.
+                    enableMyLocation();
+                } else {
+                    // permission denied, boo! Disable the functionality that depends on this permission.
+                }
+                return;
+            }
+        }
+    }
+
+    private void enableMyLocation() {
+        map.setMyLocationEnabled(true);
+    }
+
+    private void addPlace(LatLng point) {
+        MarkerOptions markerOptions = new MarkerOptions().position(point);
+        Marker newMarker = map.addMarker(markerOptions);
+        String uuid = UUID.randomUUID().toString();
+        newMarker.setTag(uuid);
+        newMarker.setDraggable(true);
+
+        final PlaceRealm newPlace = new PlaceRealm(point.latitude, point.longitude);
+        newPlace.setId(uuid);
+
+        realm.executeTransactionAsync(new Realm.Transaction() {
+            @Override
+            public void execute(Realm bgRealm) {
+                bgRealm.copyToRealm(newPlace);
+            }
+        });
+    }
+
+    private void startGalleryActivity(Marker marker) {
+        Intent intent = new Intent(MapsActivity.this, GalleryActivity.class);
+        String markerUuid = (String) marker.getTag();
+        intent.putExtra(MARKER_ID_KEY, markerUuid);
+        startActivityForResult(intent, REQUEST_SHOW_IMAGES_CODE);
     }
 }
